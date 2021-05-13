@@ -1,0 +1,20 @@
+{
+  "name": "titan-rtc-client",
+  "version": "1.0.0",
+  "description": "",
+  "source": "src/index.ts",
+  "module": "dist/titan-rtc-client.module.js",
+  "unpkg": "dist/titan-rtc-client.umd.js",
+  "main": "dist/titan-rtc-client.js",
+  "scripts": {
+    "build": "microbundle"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "microbundle": "^0.13.0",
+    "@types/webrtc": "0.0.27",
+    "nanoid": "^3.1.22"
+  }
+}
