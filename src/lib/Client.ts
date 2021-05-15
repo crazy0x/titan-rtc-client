@@ -15,16 +15,19 @@ export interface Message {
     session_id?: string,
     codec?: string,
     mid?: string,
-    uri?: string
+    uri?: string,
+    message?: string
   },
   body?: {
     candidate?: string,
     codec?: string,
     mid?: string,
-    uri?: string
+    uri?: string,
+    offer?: string
   },
   codec?: string,
   mid?: string,
+
   uri?: string,
   answer?: string,
   type?: string,
@@ -44,6 +47,9 @@ export default class Client extends EventTarget {
   private readonly pendingOutgoingSessions: Map<string, OutgoingSession> = new Map()
   private readonly pendingResponses: Map<string, (message: IncomingMessage) => void> = new Map()
   private readonly customCommands: Map<string, (message: IncomingMessage) => Promise<void>> = new Map()
+
+  private hasSetRemoteOffer: boolean = false;
+  private candidates: Array<string> = new Array
 
   public constructor(id: string, socket: WebSocket, configuration: RTCConfiguration = {}) {
     super()
@@ -100,6 +106,46 @@ export default class Client extends EventTarget {
 
     this.pendingOutgoingSessions.set(uri, session)
     return session
+  }
+
+  public async subscribeStream(uri: string) {
+    if (this.id === uri) {
+      throw new Error('Can\'t send a message to yourself')
+    } else if (this.connections.has(uri)) {
+      throw new Error('Peer connection already established')
+    } else if (this.pendingOutgoingSessions.has(uri) || this.pendingIncomingSessions.has(uri)) {
+      throw new Error('Session request already active')
+    }
+
+    const response = await this.send({
+      transaction_id: Date.parse(new Date().toString()) + "",
+      cmd: "create_session"
+    })
+
+    if (response.result == 'failed') {
+      throw new Error(response.result)
+    }
+
+    const incomingSession = new IncomingSession(this, uri)
+
+    // 订阅uri
+    if (response.result == 'success') {
+      let reqSub = {
+        cmd: "subscribe_stream",
+        transaction_id: Date.parse(new Date().toString()) + "",
+        session_id: response.response.session_id,
+        uri: uri,
+        mid: "video", // 写死video
+        codec: "h264" // 对应车的编码器类型，目前车都是h264，后面车不一定
+      }
+      this.send(reqSub)
+    }
+
+    incomingSession.addEventListener('settled', () => {
+      this.pendingIncomingSessions.delete(uri)
+    }, { once: true })
+
+    this.pendingIncomingSessions.set(uri, incomingSession)
   }
 
   public createPeerConnection(uri: string, configuration: RTCConfiguration = {}): PeerConnection {
@@ -166,26 +212,61 @@ export default class Client extends EventTarget {
       return
     }
 
+    switch (message.type) {
+      case 'publisher_offer':
+        this.handlePublishOffer(message)
+        return
+      case 'sync_candidate':
+        this.handleSyncCandidate(message)
+        return
+    }
+
     switch (message.cmd) {
+      case 'subscribe_stream':
+        console.log(message.cmd);
+        return
       case 'create_session':
-        this.handleSessionStart(message)
+        console.log(message.cmd);
         return
       case 'keepalive':
+        console.log(message.cmd);
         return
-      case 'session-accept':
-      case 'session-reject':
-      case 'session-cancel':
-      case 'session-timeout':
-        this.handleSessionUpdate(message)
+      case 'sync_candidate':
+        console.log(message.cmd);
         return
-      case 'ice':
-      case 'offer':
-      case 'answer':
-        this.handlePeerMessage(message)
+      case 'answer_stream':
+        console.log(message.cmd);
         return
-      default:
-        this.handleCustomCommand(message)
-        return
+    }
+  }
+
+  private handleSyncCandidate(message: IncomingMessage) {
+    console.log("sync_candidate");
+    console.log(message);
+    if (message.body.candidate != 'completed') {
+      if (this.candidates.indexOf(message.body.candidate) == -1) {
+        this.candidates.push(message.body.candidate);
+      }
+    }
+    if (this.hasSetRemoteOffer) {
+      // 设置candidate
+      console.log("add candidate");
+      console.log(message.body.candidate);
+      if (message.body.candidate != 'completed') {
+        this.onCandidate(message.body.candidate, message.uri);
+      }
+    }
+  }
+
+  private onCandidate(candidate: string, uri: string) {
+    if (candidate) {
+      let c = new RTCIceCandidate({
+        candidate: candidate,
+        sdpMid: "video",
+        sdpMLineIndex: 0
+      })
+      let connection = this.connections.get(uri)
+      connection.raw.addIceCandidate(c)
     }
   }
 
@@ -201,14 +282,71 @@ export default class Client extends EventTarget {
     }
   }
 
-  private handleSessionStart(message: IncomingMessage) {
-    const session = new IncomingSession(this, message.origin)
+  private handlePublishOffer(message: IncomingMessage) {
+    const session = new IncomingSession(this, message.uri)
 
     session.addEventListener('settled', () => {
-      this.pendingIncomingSessions.delete(message.origin)
+      this.pendingIncomingSessions.delete(message.uri)
     }, { once: true })
 
-    this.pendingIncomingSessions.set(message.origin, session)
+    this.pendingIncomingSessions.set(message.uri, session)
+    this.dispatchEvent(new CustomEvent('session', {
+      detail: session
+    }))
+
+    let connection = this.connections.get(message.uri)
+
+    if (!connection) {
+      connection = this.createPeerConnection(message.uri)
+      this.dispatchEvent(new CustomEvent('incoming', {
+        detail: connection
+      }))
+
+      // 设置remote_offer
+      let offer = {
+        type: "offer" as RTCSdpType,
+        sdp: message.body.offer
+      }
+      connection.raw.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
+        this.hasSetRemoteOffer = true;
+        for (let i = 0; i < this.candidates.length; i++) {
+          console.log("add candidates1");
+          console.log(this.candidates[i]);
+          this.onCandidate(this.candidates[i], message.uri);
+        }
+      })
+
+      connection.raw.createAnswer(
+        (answer: any) => {
+          connection.raw.setLocalDescription(answer);
+          console.log("local answer");
+          console.log(answer);
+          let answerStreamReq = {
+            "transaction_id": Date.parse(new Date().toString()) + "",
+            "session_id": message.session_id,
+            "cmd": "answer_stream",
+            "uri": message.uri,
+            "mid": "video",
+            "codec": "h264",
+            "answer": answer.sdp
+          }
+          this.send(answerStreamReq);
+        },
+        (error) => {
+          alert("oops...error");
+        }
+      );
+    }
+  }
+
+  private handleSessionStart(message: IncomingMessage) {
+    const session = new IncomingSession(this, message.uri)
+
+    session.addEventListener('settled', () => {
+      this.pendingIncomingSessions.delete(message.uri)
+    }, { once: true })
+
+    this.pendingIncomingSessions.set(message.uri, session)
     this.dispatchEvent(new CustomEvent('session', {
       detail: session
     }))
@@ -216,8 +354,8 @@ export default class Client extends EventTarget {
 
   private handleSessionUpdate(message: IncomingMessage) {
     // Check if we're dealing with an incoming session
-    if (this.pendingIncomingSessions.has(message.origin)) {
-      const session = this.pendingIncomingSessions.get(message.origin)
+    if (this.pendingIncomingSessions.has(message.uri)) {
+      const session = this.pendingIncomingSessions.get(message.uri)
 
       switch (message.cmd) {
         case 'session-cancel':
@@ -232,8 +370,8 @@ export default class Client extends EventTarget {
     }
 
     // Check if we're dealing with an outgoing session
-    if (this.pendingOutgoingSessions.has(message.origin)) {
-      const session = this.pendingOutgoingSessions.get(message.origin)
+    if (this.pendingOutgoingSessions.has(message.uri)) {
+      const session = this.pendingOutgoingSessions.get(message.uri)
 
       switch (message.cmd) {
         case 'session-accept':
@@ -250,16 +388,16 @@ export default class Client extends EventTarget {
   }
 
   private handlePeerMessage(message: IncomingMessage) {
-    let connection = this.connections.get(message.origin)
+    // let connection = this.connections.get(message.uri)
 
-    if (!connection) {
-      connection = this.createPeerConnection(message.origin)
-      this.dispatchEvent(new CustomEvent('incoming', {
-        detail: connection
-      }))
-    }
+    // if (!connection) {
+    //   connection = this.createPeerConnection(message.uri)
+    //   this.dispatchEvent(new CustomEvent('incoming', {
+    //     detail: connection
+    //   }))
+    // }
 
-    connection.handleMessage(message)
+    // connection.handleMessage(message)
   }
 
   private handleSocketError(ev: ErrorEvent) {

@@ -22,11 +22,11 @@ export default class IncomingSession extends EventTarget {
 
     const response = await this.client.send({
       cmd: 'session-accept',
-      target: this.origin
+      uri: this.origin
     })
 
-    if (!response.ok) {
-      const err = new Error(response.data.message)
+    if (response.result === 'failed') {
+      const err = new Error(response.response.message)
       this.settle('error', err)
       throw err
     }
@@ -41,19 +41,19 @@ export default class IncomingSession extends EventTarget {
 
     const request: OutgoingMessage = {
       cmd: 'session-reject',
-      target: this.origin
+      uri: this.origin
     }
 
     if (reason) {
-      request.data = {
+      request.response = {
         message: reason
       }
     }
 
     const response = await this.client.send(request)
 
-    if (!response.ok) {
-      const err = new Error(response.data.message)
+    if (response.result === 'failed') {
+      const err = new Error(response.response.message)
       this.settle('error', err)
       throw err
     }

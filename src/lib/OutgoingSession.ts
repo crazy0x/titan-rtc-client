@@ -22,19 +22,19 @@ export default class OutgoingSession extends EventTarget {
 
     const request: OutgoingMessage = {
       cmd: 'session-cancel',
-      target: this.target
+      uri: this.target
     }
 
     if (reason) {
-      request.data = {
+      request.response = {
         message: reason
       }
     }
 
     const response = await this.client.send(request)
 
-    if (!response.ok) {
-      const err = new Error(response.data.message)
+    if (response.result === 'failed') {
+      const err = new Error(response.response.message)
       this.settle('error', err)
       throw err
     }
