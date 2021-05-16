@@ -90,7 +90,7 @@ export default async function connect (url: string, configuration: RTCConfigurat
     //   }
 
       removeListeners()
-      resolve(new Client(message.session_id, socket, configuration))
+      resolve(new Client(message.session_id as string, socket, configuration))
     }
 
     function onError (ev: ErrorEvent) {

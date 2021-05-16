@@ -1,23 +1,25 @@
 {
-    "compilerOptions": {
-      "target": "ESNext",
-      "module": "commonjs",
-      "moduleResolution": "node",
-      "removeComments": true,
-      "preserveConstEnums": true,
-      "experimentalDecorators": true,
-      "emitDecoratorMetadata": true,
-      "esModuleInterop": true,
-      "noImplicitAny": true,
-      "declaration": true,
-      "outDir": "./dist"
-    },
-    "include": [
-      "./src/**/*"
-    ],
-    "exclude": [
-      "node_modules",
-      "dist"
-    ]
-  }
-  
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "sourceMap": true,
+    "downlevelIteration": true,
+    "lib": ["dom", "es6"]
+  },
+  "include": [
+    "./src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "启动程序",
+            "program": "${workspaceFolder}/dist/main.js",
+            "preLaunchTask": "tsc",
+            "outFiles": ["${workspaceFolder}/dist/*.js"],
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector"
+            
+        }
+    ]
+}

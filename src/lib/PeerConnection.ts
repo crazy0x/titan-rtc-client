@@ -110,16 +110,16 @@ export default class PeerConnection extends EventTarget {
 
     // Send the candidate to the remote peer
     let req: OutgoingMessage = {
-      transaction_id: Date.parse(new Date().toString()) + "",
+      transaction_id: Date.parse(new Date().toString()) + '',
       // session_id: this.client.id,
-      cmd: "sync_candidate",
-      type: "subscriber",
+      cmd: 'sync_candidate',
+      type: 'subscriber',
       uri: this.uri,
-      mid: "video",
-      codec: "h264",
+      mid: 'video',
+      codec: 'h264',
       candidates: [ev.candidate.candidate]
-      // "candidates": [event.candidate.candidate.replace('9bdd0140-a538-467c-a32f-50d5fec17dcd.local', '10.0.0.18')]
-      // "candidates": ["candidate:417137629 1 udp 2113937151 172.30.1.142 51542 typ host generation 0 ufrag 6byI network-cost 999"]
+      // 'candidates': [event.candidate.candidate.replace('9bdd0140-a538-467c-a32f-50d5fec17dcd.local', '10.0.0.18')]
+      // 'candidates': ['candidate:417137629 1 udp 2113937151 172.30.1.142 51542 typ host generation 0 ufrag 6byI network-cost 999']
     }
     await this.client.send(req);
   }

@@ -73,7 +73,7 @@ export default class Client extends EventTarget {
   }
 
   public getConnection(uri: string): PeerConnection {
-    return this.connections.get(uri)
+    return this.connections.get(uri) as PeerConnection
   }
 
   public getConnections(): PeerConnection[] {
@@ -118,8 +118,8 @@ export default class Client extends EventTarget {
     }
 
     const response = await this.send({
-      transaction_id: Date.parse(new Date().toString()) + "",
-      cmd: "create_session"
+      transaction_id: Date.parse(new Date().toString()) + '',
+      cmd: 'create_session'
     })
 
     if (response.result == 'failed') {
@@ -131,12 +131,12 @@ export default class Client extends EventTarget {
     // 订阅uri
     if (response.result == 'success') {
       let reqSub = {
-        cmd: "subscribe_stream",
-        transaction_id: Date.parse(new Date().toString()) + "",
+        cmd: 'subscribe_stream',
+        transaction_id: Date.parse(new Date().toString()) + '',
         session_id: response.response.session_id,
         uri: uri,
-        mid: "video", // 写死video
-        codec: "h264" // 对应车的编码器类型，目前车都是h264，后面车不一定
+        mid: 'video', // 写死video
+        codec: 'h264' // 对应车的编码器类型，目前车都是h264，后面车不一定
       }
       this.send(reqSub)
     }
@@ -241,7 +241,7 @@ export default class Client extends EventTarget {
   }
 
   private handleSyncCandidate(message: IncomingMessage) {
-    console.log("sync_candidate");
+    console.log('sync_candidate');
     console.log(message);
     if (message.body.candidate != 'completed') {
       if (this.candidates.indexOf(message.body.candidate) == -1) {
@@ -250,7 +250,7 @@ export default class Client extends EventTarget {
     }
     if (this.hasSetRemoteOffer) {
       // 设置candidate
-      console.log("add candidate");
+      console.log('add candidate');
       console.log(message.body.candidate);
       if (message.body.candidate != 'completed') {
         this.onCandidate(message.body.candidate, message.uri);
@@ -262,7 +262,7 @@ export default class Client extends EventTarget {
     if (candidate) {
       let c = new RTCIceCandidate({
         candidate: candidate,
-        sdpMid: "video",
+        sdpMid: 'video',
         sdpMLineIndex: 0
       })
       let connection = this.connections.get(uri)
@@ -304,13 +304,13 @@ export default class Client extends EventTarget {
 
       // 设置remote_offer
       let offer = {
-        type: "offer" as RTCSdpType,
+        type: 'offer' as RTCSdpType,
         sdp: message.body.offer
       }
       connection.raw.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
         this.hasSetRemoteOffer = true;
         for (let i = 0; i < this.candidates.length; i++) {
-          console.log("add candidates1");
+          console.log('add candidates1');
           console.log(this.candidates[i]);
           this.onCandidate(this.candidates[i], message.uri);
         }
@@ -319,21 +319,21 @@ export default class Client extends EventTarget {
       connection.raw.createAnswer(
         (answer: any) => {
           connection.raw.setLocalDescription(answer);
-          console.log("local answer");
+          console.log('local answer');
           console.log(answer);
           let answerStreamReq = {
-            "transaction_id": Date.parse(new Date().toString()) + "",
-            "session_id": message.session_id,
-            "cmd": "answer_stream",
-            "uri": message.uri,
-            "mid": "video",
-            "codec": "h264",
-            "answer": answer.sdp
+            'transaction_id': Date.parse(new Date().toString()) + '',
+            'session_id': message.session_id,
+            'cmd': 'answer_stream',
+            'uri': message.uri,
+            'mid': 'video',
+            'codec': 'h264',
+            'answer': answer.sdp
           }
           this.send(answerStreamReq);
         },
         (error) => {
-          alert("oops...error");
+          alert('oops...error');
         }
       );
     }
